@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34031.279
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cookie's Hangar Script", "Cookie's Hangar Script.csproj", "{B2A2E680-161B-4643-B6A5-B89635FF5512}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B2A2E680-161B-4643-B6A5-B89635FF5512}.Debug|x64.ActiveCfg = Debug|x64
+		{B2A2E680-161B-4643-B6A5-B89635FF5512}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8BA6E6D3-472A-4BB1-A4B7-D6FB280D11EE}
+	EndGlobalSection
+EndGlobal
