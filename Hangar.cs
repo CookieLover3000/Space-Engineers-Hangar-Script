@@ -17,6 +17,7 @@ using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Game.ObjectBuilders.Definitions;
 using VRageMath;
+using static IngameScript.Program;
 
 namespace IngameScript
 {
@@ -30,21 +31,33 @@ namespace IngameScript
             Pressurized,
             Init
         }
+
+        public enum HangarState
+        {
+            Running,
+            Idle
+        }
+
         public class Hangar
         {
+            public HangarState State { get; set; }
+            public int Id { get; set; }
+
             private List<IMyAirVent> vents;
             private List<IMyGasTank> specialTanks;
             private List<Door> doors;
-            private int id;
+
             private Program program;
-            public PressureState pressurestate;
+            private PressureState pressurestate;
             private List<IMyGasTank> oxygenTanks;
             private List<IMyGasGenerator> oxygenGenerators;
+            private List<Door> doorsInProgress = new List<Door>();
+
             public Hangar(List<IMyDoor> hangarDoors, List<IMyAirVent> vents, List<IMyGasTank> specialTanks, int id, Program program)
             {
                 this.vents = vents;
                 this.specialTanks = specialTanks;
-                this.id = id;
+                this.Id = id;
                 this.program = program;
 
                 // Add all the doors to the hangar.
@@ -63,19 +76,117 @@ namespace IngameScript
                 }
             }
 
-            public void Open()
+            public void Running()
             {
-                if (pressurestate != PressureState.Depressurized)
-                    Depressurize();
-                else
+                foreach (var door in doors)
                 {
+                    // Add door to doorsInProgress if it's in progress.
+                    if ((door.state == DoorState.Opening || door.state == DoorState.Closing) && !doorsInProgress.Contains(door))
+                        doorsInProgress.Add(door);
+                }
 
+                // Call Open or Close, depending on state. Close should be impossible.
+                foreach (var door in doorsInProgress)
+                {
+                    if (door.state == DoorState.Opening)
+                        Open(door.Id);
+                    else if (door.state == DoorState.Closing)
+                        Close(door.Id);
+                }
+
+                // doors are done, so hangar is idle
+                if (doorsInProgress.Count == 0 && (pressurestate == PressureState.Depressurized || pressurestate == PressureState.Pressurized))
+                    State = HangarState.Idle;
+                else if (pressurestate == PressureState.Depressurizing)
+                    Depressurize();
+                else if (pressurestate == PressureState.Pressurizing)
+                    Pressurize();
+            }
+
+            public void Toggle()
+            {
+                foreach (var specificDoor in doors)
+                {
+                    if (specificDoor.state == DoorState.Open || specificDoor.state == DoorState.Opening)
+                        Close(specificDoor.Id);
+                    else if (specificDoor.state == DoorState.Closed || specificDoor.state == DoorState.Closing)
+                        Open(specificDoor.Id);
                 }
             }
 
+            public void Toggle(int doorID)
+            {
+                Door specificDoor = doors.FirstOrDefault(door => door.Id == doorID);
+                if (specificDoor == null)
+                    return;
+                if (specificDoor.state == DoorState.Open || specificDoor.state == DoorState.Opening)
+                    Close(specificDoor.Id);
+                else if (specificDoor.state == DoorState.Closed || specificDoor.state == DoorState.Closing)
+                    Open(specificDoor.Id);
+
+            }
+
+            // version of Open for all doors
+            public void Open()
+            {
+                // hangar is doing stuff.
+                State = HangarState.Running;
+                if (pressurestate != PressureState.Depressurized)
+                {
+                    Depressurize();
+                    foreach (var door in doors)
+                        door.state = DoorState.Opening;
+                }
+                else // hangar is deppressurized
+                {
+                    foreach (var door in doors)
+                    {
+                        door.Open();
+                        doorsInProgress.Remove(door);
+                    }
+                }
+            }
+
+            // version of Open for single door
+            public void Open(int doorID)
+            {
+                Door specificDoor = doors.FirstOrDefault(door => door.Id == doorID);
+                if (specificDoor == null)
+                    return;
+                // hangar is doing stuff.
+                State = HangarState.Running;
+                if (pressurestate != PressureState.Depressurized)
+                {
+                    Depressurize();
+                    specificDoor.state = DoorState.Opening;
+                }
+                else // hangar is deppressurized
+                {
+                    specificDoor.Open();
+                    doorsInProgress.Remove(specificDoor);
+                }
+            }
+
+            // Version of Close for all doors
             public void Close()
             {
+                // hangar is doing stuff.
+                State = HangarState.Running;
+                foreach (var door in doors)
+                    door.Close();
+                Pressurize();
+            }
 
+            // Version of Close for single door
+            public void Close(int doorID)
+            {
+                Door specificDoor = doors.FirstOrDefault(door => door.Id == doorID);
+                if (specificDoor == null)
+                    return;
+                // hangar is doing stuff.
+                State = HangarState.Running;
+                specificDoor.Close();
+                Pressurize();
             }
 
             private void Pressurize()
@@ -97,7 +208,7 @@ namespace IngameScript
                         vent.Depressurize = false;
                 }
                 //if (specialTank.FilledRatio < 0.000001f)
-                if(specialTanks.All(specialTank => specialTank.FilledRatio < 0.000001f))
+                if (specialTanks.All(specialTank => specialTank.FilledRatio < 0.000001f))
                 {
                     //program.Echo($"{specialTank} is empty, enabling other tanks");
                     foreach (var tank in oxygenTanks)
@@ -112,8 +223,8 @@ namespace IngameScript
                         tank.Enabled = true;
                     foreach (var generator in oxygenGenerators)
                         generator.Enabled = true;
-                foreach (var tank in specialTanks)
-                    tank.Enabled = false;
+                    foreach (var tank in specialTanks)
+                        tank.Enabled = false;
                 }
             }
 
@@ -162,17 +273,20 @@ namespace IngameScript
                 }
             }
 
+            // return the up value of a hangardoor based on it's rotation
             Vector3I ReturnUpValue(IMyDoor hangarDoor)
             {
                 // need to return negative value
                 return -Base6Directions.GetIntVector(hangarDoor.Orientation.Up);
             }
 
+            // return the left value of a hangardoor based on it's rotation
             Vector3I ReturnLeftValue(IMyDoor hangarDoor)
             {
                 return Base6Directions.GetIntVector(hangarDoor.Orientation.Left);
             }
 
+            // return the right value of a hangardoor based on it's rotation
             Vector3I ReturnRightValue(IMyDoor hangarDoor)
             {
                 return -Base6Directions.GetIntVector(hangarDoor.Orientation.Left);
@@ -189,78 +303,58 @@ namespace IngameScript
 
             void AddHangarDoorsRecursive(IMyDoor hangarDoor, List<IMyDoor> doors)
             {
+                // get current position of the door
                 Vector3I doorPosition = hangarDoor.Position;
+                // get current position of door in grid
                 IMyCubeGrid grid = hangarDoor.CubeGrid;
+                // tbh, still don't know what a slimblock is
                 IMySlimBlock slimBlock;
 
+                // check if a door is above the current door
                 slimBlock = grid.GetCubeBlock(doorPosition + (ReturnUpValue(hangarDoor) * 3));
-
+                // Found something!
                 if (slimBlock != null)
                 {
                     IMyDoor adjacentHangarBlock = slimBlock.FatBlock as IMyDoor;
                     if (!doors.Contains(adjacentHangarBlock))
                     {
+                        // Add the door to the list of adjacentdoors
                         doors.Add(adjacentHangarBlock);
+                        // look for more doors from the position of the new door
                         AddHangarDoorsRecursive(adjacentHangarBlock, doors);
                     }
                 }
 
+                // check if a door is to the left of the current door
                 slimBlock = grid.GetCubeBlock(doorPosition + (ReturnLeftValue(hangarDoor) + ReturnUpValue(hangarDoor)));
+                // Found something!
                 if (slimBlock != null)
                 {
                     IMyDoor adjacentHangarBlock = slimBlock.FatBlock as IMyDoor;
                     if (!doors.Contains(adjacentHangarBlock))
                     {
+                        // Add the door to the list of adjacentdoors
                         doors.Add(adjacentHangarBlock);
+                        // look for more doors from the position of the new door
                         AddHangarDoorsRecursive(adjacentHangarBlock, doors);
                     }
                 }
 
+                // check if a door is to the right of the current door
                 slimBlock = grid.GetCubeBlock(doorPosition + (ReturnRightValue(hangarDoor) + ReturnUpValue(hangarDoor)));
+                // Found something!
                 if (slimBlock != null)
                 {
                     IMyDoor adjacentHangarBlock = slimBlock.FatBlock as IMyDoor;
                     if (!doors.Contains(adjacentHangarBlock))
                     {
+                        // Add the door to the list of adjacentdoors
                         doors.Add(adjacentHangarBlock);
+                        // look for more doors from the position of the new door
                         AddHangarDoorsRecursive(adjacentHangarBlock, doors);
                     }
                 }
             }
-
-            void GetAdjacentHangarBlocksRecursive(IMyDoor currentHangarDoor, List<IMyDoor> result)
-            {
-                IMyCubeGrid grid = currentHangarDoor.CubeGrid;
-
-                if (grid == null)
-                    return;
-
-                Vector3I doorPosition = currentHangarDoor.Position;
-
-                // Check to the left and right (X-axis)
-                for (int xOffset = -1; xOffset <= 1; xOffset++)
-                {
-                    Vector3I adjacentPosition = new Vector3I(doorPosition.X + xOffset, doorPosition.Y, doorPosition.Z);
-                    IMySlimBlock adjacentSlimBlock = grid.GetCubeBlock(adjacentPosition);
-
-                    if (adjacentSlimBlock != null)
-                    {
-                        IMyDoor adjacentHangarBlock = adjacentSlimBlock.FatBlock as IMyDoor;
-
-                        if (adjacentHangarBlock != null && !result.Contains(adjacentHangarBlock))
-                        {
-                            result.Add(adjacentHangarBlock);
-
-                            // Recursively check for adjacent hangar doors of the newly found hangar door
-                            GetAdjacentHangarBlocksRecursive(adjacentHangarBlock, result);
-                        }
-                    }
-                }
-            }
-
-
-
-
-        }
-    }
-}
+        } // class bracket
+    } // cringe wrapper 1
+} // cringe wrapper 2

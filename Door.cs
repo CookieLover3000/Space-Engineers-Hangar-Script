@@ -22,26 +22,36 @@ namespace IngameScript
 {
     partial class Program
     {
+        public enum DoorState
+        {
+            Opening,
+            Open,
+            Closing,
+            Closed
+        }
         public class Door
         {
             private List<IMyDoor> hangarDoors;
-            private int id;
-            public Door(List<IMyDoor> hangarDoors, int id)
+            public int Id { get; set; }
+            public DoorState state;
+            public Door(List<IMyDoor> hangarDoors, int Id)
             {
                 this.hangarDoors = hangarDoors;
-                this.id = id;
+                this.Id = Id;
             }
 
             public void Open()
             {
                 foreach (IMyDoor door in hangarDoors)
                     door.OpenDoor();
+                state = DoorState.Open;
             }
 
             public void Close()
             {
                 foreach (IMyDoor door in hangarDoors)
                     door.CloseDoor();
+                state = DoorState.Closed;
             }
         }
     }
