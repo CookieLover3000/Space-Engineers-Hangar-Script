@@ -1,5 +1,24 @@
 ﻿R e a d m e
 -----------
 
-In this file you can include any instructions or other comments you want to have injected onto the 
-top of your final script. You can safely delete this file if you do not want any such comments.
+How to use the script?
+----------------------
+
+This script has three commands:
+- Toggle: Changes the state of the door to the opposite of it's current state (so 'open -> close' and 'close -> open')
+- Open: Opens the door.
+- Close: closes the door
+
+To use these commands you will have to specify the hangar and what door of the hangar you want to use it on.
+Example: "Open 1 1" This will open door 1 from hangar 1. If you use "all" instead of a number it will execute the command for all hangars/doors.
+
+Installation Instructions
+-------------------------
+
+To set up the hangar system you will have to add the hangar identifier as well as the number of the hangar to the items. 
+Below is an example on how to do this for door 1.
+
+To create a hangar with two doors:
+Add "[Hangar 1]" to all the hangar doors in the hangar.
+Add "[Hangar 1]" to the air vents in the hangar.
+Add "[Hangar Special Oxygen Tank]" to the oxygen tanks you want to use for the hangars.

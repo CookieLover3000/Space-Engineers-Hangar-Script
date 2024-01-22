@@ -45,12 +45,10 @@ namespace IngameScript
 
             private List<IMyAirVent> vents;
             private List<IMyGasTank> specialTanks;
-            private List<Door> doors;
+            private List<Door> doors = new List<Door>();
 
             private Program program;
             private PressureState pressurestate;
-            private List<IMyGasTank> oxygenTanks;
-            private List<IMyGasGenerator> oxygenGenerators;
             private List<Door> doorsInProgress = new List<Door>();
 
             public Hangar(List<IMyDoor> hangarDoors, List<IMyAirVent> vents, List<IMyGasTank> specialTanks, int id, Program program)
@@ -59,48 +57,75 @@ namespace IngameScript
                 this.specialTanks = specialTanks;
                 this.Id = id;
                 this.program = program;
-
                 // Add all the doors to the hangar.
                 int i = 0;
+                program.Echo($"door state: {hangarDoors[0].Status}");
                 while (hangarDoors.Count > 0)
                 {
                     // increase integer to get new number for door
                     i++;
                     // look for all the hangar doors that are part of a door
-                    List<IMyDoor> hangarBlocks = GetAdjacentHangarBlocks(hangarDoors[0]);
-                    // remove found hangar doors from hangarDoors
+                    List<IMyDoor> hangarBlocks = new List<IMyDoor>();
+                    hangarBlocks = GetAdjacentHangarBlocks(hangarDoors[0]);
+                    //remove found hangar doors from hangarDoors
                     foreach (var door in hangarBlocks)
                         hangarDoors.Remove(door);
+                    //program.Echo($"amount of hangar doors: {hangarDoors.Count()}");
+                    //program.Echo($"amount of hangar blocks: {hangarBlocks.Count()}");
                     // Create new Door
-                    doors.Add(new Door(hangarBlocks, i));
+                    doors.Add(new Door(hangarBlocks, i, program));
                 }
+                program.Echo($"door amount: {doors.Count}");
             }
 
             public void Running()
             {
+                //program.Echo($"Running hangar {Id}");
+                //program.Echo($"Running door {Id}");
+                //program.Echo($"doors in progress: {doorsInProgress.Count()}");
+                //program.Echo($"doors count: {doors.Count()}");
+                List<Door> doorsToRemove = new List<Door>();
+
                 foreach (var door in doors)
                 {
                     // Add door to doorsInProgress if it's in progress.
                     if ((door.state == DoorState.Opening || door.state == DoorState.Closing) && !doorsInProgress.Contains(door))
+                    {
                         doorsInProgress.Add(door);
+                    }
                 }
 
                 // Call Open or Close, depending on state. Close should be impossible.
                 foreach (var door in doorsInProgress)
                 {
+                    program.Echo($"door state: {door.state}");
                     if (door.state == DoorState.Opening)
+                    {
                         Open(door.Id);
+                    }
                     else if (door.state == DoorState.Closing)
+                    {
                         Close(door.Id);
+                    }
+                    else if (door.state == DoorState.Closed || door.state == DoorState.Open)
+                    {
+                        doorsToRemove.Add(door);
+                    }
                 }
 
+                foreach (var door in doorsToRemove)
+                    doorsInProgress.Remove(door);
+
                 // doors are done, so hangar is idle
-                if (doorsInProgress.Count == 0 && (pressurestate == PressureState.Depressurized || pressurestate == PressureState.Pressurized))
-                    State = HangarState.Idle;
-                else if (pressurestate == PressureState.Depressurizing)
-                    Depressurize();
-                else if (pressurestate == PressureState.Pressurizing)
-                    Pressurize();
+                if (doorsInProgress.Count == 0)
+                {
+                    if (doors.All(door => door.state == DoorState.Closed) && pressurestate != PressureState.Pressurized)
+                        Pressurize();
+                    else
+                    {
+                        State = HangarState.Idle;
+                    }
+                }
             }
 
             public void Toggle()
@@ -129,6 +154,7 @@ namespace IngameScript
             // version of Open for all doors
             public void Open()
             {
+                program.Echo($"Open hangar {Id}");
                 // hangar is doing stuff.
                 State = HangarState.Running;
                 if (pressurestate != PressureState.Depressurized)
@@ -142,7 +168,6 @@ namespace IngameScript
                     foreach (var door in doors)
                     {
                         door.Open();
-                        doorsInProgress.Remove(door);
                     }
                 }
             }
@@ -150,6 +175,7 @@ namespace IngameScript
             // version of Open for single door
             public void Open(int doorID)
             {
+                program.Echo($"Open hangar {Id}");
                 Door specificDoor = doors.FirstOrDefault(door => door.Id == doorID);
                 if (specificDoor == null)
                     return;
@@ -163,34 +189,38 @@ namespace IngameScript
                 else // hangar is deppressurized
                 {
                     specificDoor.Open();
-                    doorsInProgress.Remove(specificDoor);
                 }
             }
 
             // Version of Close for all doors
             public void Close()
             {
+                program.Echo($"Close hangar {Id}");
                 // hangar is doing stuff.
                 State = HangarState.Running;
                 foreach (var door in doors)
                     door.Close();
-                Pressurize();
+                //Pressurize();
             }
 
             // Version of Close for single door
             public void Close(int doorID)
             {
+                program.Echo($"Close hangar {Id}");
                 Door specificDoor = doors.FirstOrDefault(door => door.Id == doorID);
                 if (specificDoor == null)
                     return;
                 // hangar is doing stuff.
                 State = HangarState.Running;
                 specificDoor.Close();
-                Pressurize();
+                //Pressurize();
             }
 
             private void Pressurize()
             {
+                program.Echo($"Pressurize hangar {Id}");
+                List<IMyGasTank> oxygenTanks = new List<IMyGasTank>();
+                List<IMyGasGenerator> oxygenGenerators = new List<IMyGasGenerator>();
                 program.GridTerminalSystem.GetBlocksOfType<IMyGasTank>(oxygenTanks, x => x.DetailedInfo.Split(' ')[1] == "Oxygen");
                 program.GridTerminalSystem.GetBlocksOfType(oxygenGenerators);
 
@@ -230,6 +260,9 @@ namespace IngameScript
 
             private void Depressurize()
             {
+                program.Echo($"Depressurize hangar {Id}");
+                List<IMyGasTank> oxygenTanks = new List<IMyGasTank>();
+                List<IMyGasGenerator> oxygenGenerators = new List<IMyGasGenerator>();
                 program.GridTerminalSystem.GetBlocksOfType<IMyGasTank>(oxygenTanks, x => x.DetailedInfo.Split(' ')[1] == "Oxygen");
                 program.GridTerminalSystem.GetBlocksOfType(oxygenGenerators);
 

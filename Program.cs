@@ -24,7 +24,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        string specialTankID = "special Oxygen Tank";
+        string specialTankID = "Special Oxygen Tank";
         string hangarID = "[Hangar ";
 
         int maxHangarAmount = 10;
@@ -52,6 +52,7 @@ namespace IngameScript
         public void Main(string argument, UpdateType updateSource)
         {
             ParseData(argument);
+            Running();
         }
 
         public void ParseData(string argument) // Parse the arguments that are given to the programmable blcok.
@@ -134,7 +135,7 @@ namespace IngameScript
             }
             else if (doorSpecifier == null)
             {
-                Echo($"Please specify a door to open for Hangar {hangarSpecifier}");
+                Echo($"Please specify a door to open for Hangar {hangarSpecifier}.");
                 return;
             }
 
@@ -164,6 +165,7 @@ namespace IngameScript
                     Echo($"Cannot find Door {doorSpecifier} from unknown hangar. Please try again.");
                 return;
             }
+            Echo($"door ID: {doorID}");
 
             // toggle all hangars to change
             if (allHangars)
@@ -191,7 +193,7 @@ namespace IngameScript
                 if (allDoors)
                     specificHangar.Toggle();
                 else // single door
-                    specificHangar.Toggle(hangarID);
+                    specificHangar.Toggle(doorID);
             }
         }
 
@@ -215,7 +217,7 @@ namespace IngameScript
             }
             else if (doorSpecifier == null)
             {
-                Echo($"Please specify a door to open for Hangar {hangarSpecifier}");
+                Echo($"Please specify a door to open for Hangar {hangarSpecifier}.");
                 return;
             }
 
@@ -272,7 +274,7 @@ namespace IngameScript
                 if (allDoors)
                     specificHangar.Open();
                 else // single door
-                    specificHangar.Open(hangarID);
+                    specificHangar.Open(doorID);
             }
         }
 
@@ -291,18 +293,18 @@ namespace IngameScript
 
             if (hangarSpecifier == null)
             {
-                Echo("Please specify a hangar to open.");
+                Echo("Please specify a hangar to close.");
                 return;
             }
             else if (doorSpecifier == null)
             {
-                Echo($"Please specify a door to open for Hangar {hangarSpecifier}");
+                Echo($"Please specify a door to close for Hangar {hangarSpecifier}.");
                 return;
             }
 
-            // Check if you want to open all Hangars.
+            // Check if you want to Close all Hangars.
             bool allHangars = string.Equals(hangarSpecifier, "all", StringComparison.OrdinalIgnoreCase);
-            // Check if you want to open all Doors.
+            // Check if you want to Close all Doors.
             bool allDoors = string.Equals(doorSpecifier, "all", StringComparison.OrdinalIgnoreCase);
 
             // here to stop program from trying to find hangarID when all hangars need to Toggle
@@ -326,6 +328,7 @@ namespace IngameScript
                     Echo($"Cannot find Door {doorSpecifier} from unknown hangar. Please try again.");
                 return;
             }
+            Echo($"door ID: {doorID}");
 
             // toggle all hangars to change
             if (allHangars)
@@ -353,7 +356,7 @@ namespace IngameScript
                 if (allDoors)
                     specificHangar.Close();
                 else // single door
-                    specificHangar.Close(hangarID);
+                    specificHangar.Close(doorID);
             }
         }
 
@@ -371,13 +374,22 @@ namespace IngameScript
 
             for (i = 1; i <= maxHangarAmount; i++)
             {
+                Echo($"i: {i}");
                 List<IMyDoor> doors = new List<IMyDoor>();
                 List<IMyAirVent> vents = new List<IMyAirVent>();
                 List<IMyGasTank> specialTanks = new List<IMyGasTank>();
 
                 foreach (IMyTerminalBlock block in blocks)
                 {
-                    if (block.CustomName.Contains(i.ToString()))
+                    if (block.CustomName.Contains(specialTankID))
+                    {
+                        if (block is IMyGasTank)
+                        {
+                            tank = block as IMyGasTank;
+                            specialTanks.Add(tank);
+                        }
+                    }
+                    if (block.CustomName.Contains(i.ToString() + "]"))
                     {
                         bool hangarExists = Hangars.Any(hangar => hangar.Id == i);
                         if (hangarExists)
@@ -397,20 +409,20 @@ namespace IngameScript
                                 vent = block as IMyAirVent;
                                 vents.Add(vent);
                             }
-                            else if (block is IMyGasTank)
-                            {
-                                tank = block as IMyGasTank;
-                                specialTanks.Add(tank);
-                            }
+
                         }
                     }
                 }
-
+                Echo($"doors Count: {doors.Count}");
+                Echo($"vents Count: {vents.Count}");
+                Echo($"tank Count: {specialTanks.Count}");
                 if (doors.Count > 0 && vents.Count > 0 && specialTanks.Count > 0)
+                {
                     Hangars.Add(new Hangar(doors, vents, specialTanks, id, this));
+                }
                 else
                 {
-                    Echo($"Could not create Hangar with ID: {id}. Leaving Program.");
+                    Echo($"Could not create Hangar with ID: {i}. Leaving Program.");
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     return;
                 }
